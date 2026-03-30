@@ -1,13 +1,14 @@
 """
 DIAMOND 每日任务入口脚本
-每天只翻译当天最新的 3 篇文章，避免单次翻译内容过长
+每天只翻译当天最新的 3 篇文章标题+摘要，避免内容过长
 """
 import os
 import re
+import glob
 from datetime import datetime
 import pytz
 
-tz_est = pytz.timezone('America/New_York')
+tz_est = pytz.timezone("America/New_York")
 today = datetime.now(tz_est).strftime("%Y%m%d")
 
 # Step 1: 抓取新闻
@@ -15,92 +16,94 @@ print("Step 1: 抓取新闻...")
 import rss_parser
 rss_parser.main()
 
-# Step 2: 只翻译今日最新的 3 篇文章
-print("Step 2: 翻译今日最新 3 篇文章...")
-dailynews_file = os.path.join("dailynews", f"{today}.md")
+# Step 2: 只翻译今日最新 3 篇文章（仅标题+摘要，不含全文）
+print("Step 2: 翻译今日最新 3 篇文章（标题+摘要）...")
+dailynews_file = os.path.join("dailynews", today + ".md")
+
+import translate_news
 
 if not os.path.exists(dailynews_file):
-    print(f"No today's news file: {dailynews_file}")
-    # 列出可用的文件
-    import glob
+    print("No today file: " + dailynews_file)
     files = sorted(glob.glob("dailynews/*.md"))
-    print(f"Available: {files[-5:]}")
+    print("Available: " + str(files[-5:]))
 else:
-    import translate_news
-
-    with open(dailynews_file, 'r', encoding='utf-8') as f:
+    with open(dailynews_file, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 按分隔符分割文章
-    raw_articles = content.split('---')
-
-    # 过滤出有效的文章块
+    # 按文章分割（每篇文章以 "## 文章" 或 "标题：" 开头）
+    # DIAMOND rss_parser 格式：每篇文章之间用 "---" 分隔
+    raw_articles = content.split("---")
     articles = []
     for raw in raw_articles:
         raw = raw.strip()
-        if not raw:
+        if not raw or len(raw) < 50:
             continue
-        # 提取发布日期来验证是今天的
-        m = re.search(r'(\d{4}-\d{2}-\d{2})', raw)
-        if m:
-            articles.append((m.group(1), raw))
-        elif raw.startswith('#') or len(raw) > 100:
-            # 没有日期但有内容的也保留
-            articles.append(('unknown', raw))
+        articles.append(raw)
 
-    print(f"Total articles parsed: {len(articles)}")
+    print("Total articles: " + str(len(articles)))
 
     # 取最新的 3 篇
     top3 = articles[-3:]
-    print(f"Translating latest {len(top3)} articles")
-    for date, _ in top3:
-        title_m = re.search(r'# (.+)', _)
-        title = title_m.group(1)[:40] if title_m else 'unknown'
-        print(f"  - [{date}] {title}...")
+    print("Using latest " + str(len(top3)) + " articles")
 
-    combined = '\n\n---\n\n'.join(a for _, a in top3)
-    temp_file = os.path.join("dailynews", f"{today}_top3.md")
-    with open(temp_file, 'w', encoding='utf-8') as f:
+    # 只保留每篇文章的前 500 字符（标题+摘要），去掉全文
+    truncated = []
+    for art in top3:
+        lines = art.split("\n")
+        # 取前 10 行或 500 字符，以较小者为准
+        short = "\n".join(lines[:10])
+        if len(short) > 500:
+            short = short[:500] + "..."
+        truncated.append(short)
+
+    combined = "\n\n---\n\n".join(truncated)
+    print("Combined length: " + str(len(combined)) + " chars")
+
+    temp_file = os.path.join("dailynews", today + "_top3.md")
+    with open(temp_file, "w", encoding="utf-8") as f:
         f.write(combined)
-    print(f"Written temp file: {temp_file}")
 
     success = translate_news.translate_file(temp_file)
 
     # 翻译结果写入 translate/{today}.md
-    translate_dir = "translate"
-    os.makedirs(translate_dir, exist_ok=True)
-    translate_output = os.path.join(translate_dir, f"{today}.md")
-    translated_temp = os.path.join(translate_dir, f"{today}_top3.md")
+    os.makedirs("translate", exist_ok=True)
+    translate_output = os.path.join("translate", today + ".md")
+    translated_temp = os.path.join("translate", today + "_top3.md")
 
     if success and os.path.exists(translated_temp):
-        with open(translated_temp, 'r', encoding='utf-8') as f:
+        with open(translated_temp, "r", encoding="utf-8") as f:
             new_content = f.read()
-
-        # 追加模式
         if os.path.exists(translate_output):
-            with open(translate_output, 'r', encoding='utf-8') as f:
+            with open(translate_output, "r", encoding="utf-8") as f:
                 existing = f.read()
-            combined_trans = existing + '\n\n---\n\n' + new_content
+            combined_trans = existing + "\n\n---\n\n" + new_content
         else:
             combined_trans = new_content
-
-        with open(translate_output, 'w', encoding='utf-8') as f:
+        with open(translate_output, "w", encoding="utf-8") as f:
             f.write(combined_trans)
-        print(f"[OK] Translated saved: {translate_output}")
-
+        print("Translated saved: " + translate_output)
         os.remove(translated_temp)
     else:
-        print("[ERR] Translation failed")
+        print("Translation failed")
 
-    os.remove(temp_file)
+    if os.path.exists(temp_file):
+        os.remove(temp_file)
 
 # Step 3: 发送今日邮件
 print("Step 3: 发送今日邮件...")
-translate_path = os.path.join("translate", f"{today}.md")
-if os.path.exists(translate_path):
+translate_path = os.path.join("translate", today + ".md")
+if not os.path.exists(translate_path):
+    t_files = sorted(glob.glob("translate/*.md"))
+    if t_files:
+        translate_path = t_files[-1]
+        print("Using latest: " + translate_path)
+    else:
+        translate_path = None
+
+if translate_path and os.path.exists(translate_path):
     import send_email
     send_email.main(translate_path)
 else:
-    print(f"No translated file for today: {translate_path}")
+    print("No translate file, skip email")
 
 print("Done!")
