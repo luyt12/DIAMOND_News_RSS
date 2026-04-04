@@ -1,94 +1,89 @@
 """
-DIAMOND 姣忔棩浠诲姟鍏ュ彛鑴氭湰
-姣忓ぉ鎶撳彇鏂伴椈锛岀炕璇戝綋澶╂渶鏂扮殑3绡囨枃绔狅紝姣忕瘒鍗曠嫭鍙戦€佷竴灏侀偖浠?"""
+DIAMOND 姣忔棩浠诲姟鍏ュ彛
+鎶撳彇褰撳ぉ鏂囩珷 鈫?鍘婚噸锛堟渶澶?0绡囷級鈫?鎻愮偧瑕佺偣+缈昏瘧 鈫?姣忕瘒鐙珛鍙戦€侀偖浠?"""
 import os
-import re
 import glob
+import json
 from datetime import datetime
 import pytz
 
-tz_est = pytz.timezone("America/New_York")
-today = datetime.now(tz_est).strftime("%Y%m%d")
+tz_tokyo = pytz.timezone("Asia/Tokyo")
+today_str = datetime.now(tz_tokyo).strftime("%Y%m%d")
 
-# Step 1: 鎶撳彇鏂伴椈
-print("Step 1: 鎶撳彇鏂伴椈...")
+SENT_FILE = "sent_articles.json"
+
+
+def load_sent():
+    if os.path.exists(SENT_FILE):
+        try:
+            with open(SENT_FILE, "r", encoding="utf-8") as f:
+                return set(json.load(f).get("sent", []))
+        except Exception:
+            pass
+    return set()
+
+
+def save_sent(urls):
+    with open(SENT_FILE, "w", encoding="utf-8") as f:
+        json.dump({"sent": list(urls)}, f, ensure_ascii=False, indent=2)
+
+
+# Step 1: 鎶撳彇褰撳ぉ鏂囩珷锛堝凡鍖呭惈鍘婚噸+鏈€澶?0绡囷紝杩斿洖 [(filepath, url), ...]锛?print("Step 1: 鎶撳彇褰撳ぉ鏂囩珷...")
 import rss_parser
-rss_parser.main()
+saved = rss_parser.main()
 
-# Step 2: 璇诲彇褰撳ぉ鏂伴椈锛屾媶鍒嗘垚3绡囩嫭绔嬫枃浠讹紝鍒嗗埆缈昏瘧锛屾瘡绡囧彂涓€灏侀偖浠?print("Step 2: 缈昏瘧骞跺彂閫佸綋鏃?绡囨枃绔?..")
-dailynews_file = os.path.join("dailynews", today + ".md")
+if not saved:
+    print("浠婃棩鏃犳柊鏂囩珷锛岄€€鍑?)
+    exit(0)
 
-import translate_news
+print(f"鎶撳彇鍒?{len(saved)} 绡囨柊鏂囩珷")
 
-if not os.path.exists(dailynews_file):
-    files = sorted(glob.glob("dailynews/*.md"))
-    if not files:
-        print("No dailynews file found at all")
-    else:
-        dailynews_file = files[-1]
-        print("Using latest: " + dailynews_file)
+# Step 2: 鍔犺浇宸插彂閫佽褰曪紝骞惰拷鍔犱粖鏃?URL
+sent_urls = load_sent()
+for _, url in saved:
+    sent_urls.add(url)
 
-if os.path.exists(dailynews_file):
-    with open(dailynews_file, "r", encoding="utf-8") as f:
-        content = f.read()
+# Step 3: 鎵惧埌浠婃棩鏂囩珷鏂囦欢锛堢敱 rss_parser 淇濆瓨鐨勶級
+today_files = sorted(glob.glob(os.path.join("dailynews", today_str + "_art*.md")))
+if not today_files:
+    print("鏈壘鍒颁粖鏃ユ枃绔犳枃浠?)
+    exit(1)
 
-    # 鎸?"---" 鍒嗛殧鎴愮嫭绔嬫枃绔?    raw_articles = content.split("---")
-    articles = []
-    for raw in raw_articles:
-        raw = raw.strip()
-        if not raw or len(raw) < 50:
-            continue
-        articles.append(raw)
+print(f"寮€濮嬪鐞?{len(today_files)} 绡囨枃绔?..")
 
-    print("Total articles: " + str(len(articles)))
+# Step 4: 鎻愮偧+缈昏瘧锛屾瘡绡囧彂閫侀偖浠?import translate_news
+import send_email
 
-    # 鍙栨渶鏂?绡囷紙鏁扮粍鏈熬3涓級
-    top3 = articles[-3:] if len(articles) >= 3 else articles
-    print("Translating " + str(len(top3)) + " articles")
+success_count = 0
+for filepath in today_files:
+    print(f"\n澶勭悊: {os.path.basename(filepath)}")
 
-    import send_email
+    # 鎻愮偧+缈昏瘧
+    ok = translate_news.translate_file(filepath)
+    if not ok:
+        print(f"  缈昏瘧澶辫触")
+        continue
 
-    success_count = 0
-    for i, art in enumerate(top3):
-        art_num = i + 1
-        # 淇濆瓨涓虹嫭绔嬫枃浠讹紙鍙惈杩欎竴绡囷級
-        single_file = os.path.join("dailynews", today + "_art" + str(art_num) + ".md")
-        with open(single_file, "w", encoding="utf-8") as f:
-            f.write(art)
-        print("Saved article " + str(art_num) + ": " + single_file)
+    # 缈昏瘧缁撴灉璺緞
+    basename = os.path.basename(filepath)
+    translated_file = os.path.join("translate", basename)
 
-        # 缈昏瘧
-        ok = translate_news.translate_file(single_file)
-        if not ok:
-            print("Translation failed for article " + str(art_num))
-            # 娓呯悊涓存椂鏂囦欢
-            if os.path.exists(single_file):
-                os.remove(single_file)
-            continue
+    if not os.path.exists(translated_file):
+        print(f"  缈昏瘧鏂囦欢涓嶅瓨鍦? {translated_file}")
+        continue
 
-        # 缈昏瘧缁撴灉璺緞
-        translated_file = os.path.join("translate", today + "_art" + str(art_num) + ".md")
+    # 鍙戦€侀偖浠?    try:
+        send_email.main(translated_file)
+        print(f"  閭欢宸插彂閫?)
+        success_count += 1
+    except Exception as e:
+        print(f"  閭欢鍙戦€佸け璐? {e}")
 
-        # 娓呯悊鍘熷涓存椂鏂囦欢
-        if os.path.exists(single_file):
-            os.remove(single_file)
+    # 鍒犻櫎缈昏瘧涓存椂鏂囦欢
+    try:
+        os.remove(translated_file)
+    except Exception:
+        pass
 
-        # 鍙戦€侀偖浠?        if os.path.exists(translated_file):
-            try:
-                send_email.main(translated_file)
-                print("Email sent for article " + str(art_num))
-                success_count += 1
-            except Exception as e:
-                print("Email send error: " + str(e))
-            # 缈昏瘧鍚庣殑涓存椂鏂囦欢涔熸竻鐞?            try:
-                os.remove(translated_file)
-            except Exception:
-                pass
-        else:
-            print("Translated file not found: " + translated_file)
-
-    print("Successfully sent " + str(success_count) + "/" + str(len(top3)) + " emails")
-else:
-    print("No dailynews file found: " + dailynews_file)
-
-print("Done!")
+# Step 5: 淇濆瓨宸插彂閫佽褰?save_sent(sent_urls)
+print(f"\n瀹屾垚锛氭垚鍔熷彂閫?{success_count}/{len(today_files)} 灏侀偖浠?)
