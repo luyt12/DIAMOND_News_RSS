@@ -2,7 +2,7 @@
 DIAMOND RSS Parser
 Fetch today articles, dedup, save each separately
 """
-import feedparser, requests, pytz, json, time, logging
+import feedparser, requests, pytz, json, time, logging, os
 from bs4 import BeautifulSoup
 from datetime import datetime
 
