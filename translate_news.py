@@ -1,110 +1,135 @@
-import smtplib
-import os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
-
-today = datetime.now().strftime('%Y-%m-%d')
-
-report = f"""馃摪 姣忔棩绠€鎶?鈥?{today}
-
-================================================================
-馃實 鍦扮紭鏀挎不锛氱編浼婃垬浜夛紙绗?0澶╋級
-----------------------------------------------------------------------
-鈥?缇庡浗鍜屼互鑹插垪鑱斿悎鎵撳嚮浼婃湕澧冨唴鍐涗簨鐩爣锛屼互鑹插垪琚嚮浜嗗崡甯曞皵鏂ぉ鐒舵皵鐢?鈥?娌逛环椋欏崌 鈥?鍏ㄧ悆鑳芥簮甯傚満鍙楀埌閲嶅ぇ鍐插嚮
-鈥?鐗规湕鏅細"涓嶄細鍚戜紛鏈楁淳閬ｅ湴闈㈤儴闃?
-鈥?鏍稿績鎯呮姤鎽樿锛氱編浠ュ啿绐佺20澶╋紝缇庡啗娣卞叆鎵撳嚮浼婃湕澧冨唴鍐涗簨鐩爣锛屼互鑹插垪琚嚮鍗楀笗灏旀柉姘旂敯瀵艰嚧鑳芥簮浠锋牸鏆存定銆?
-馃搸 鏉ユ簮锛?  - CNN: https://www.cnn.com/2026/03/19/middleeast/us-israel-iran-middle-east-war-day-20-what-we-know-intl-hnk
-  - Al Jazeera: https://www.aljazeera.com/video/newsfeed/2026/3/20/unpacking-netanyahus-latest-claims-about-the-war-on-iran
-  - Fox News: https://www.foxnews.com/video/6391246686112
-
-----------------------------------------------------------------------
-馃 AI 涓庣鎶€
-----------------------------------------------------------------------
-鈥?AI 鍩虹璁炬柦蹇€熸墿寮?鈥?Cerebras 鐧婚檰 AWS銆丯VIDIA 寮€鏀炬暟鎹鍒?鈥?2026骞?鏈堝涓柊 AI 妯″瀷鍙戝竷锛涘垵鍒涘叕鍙稿彈鐩婁簬鍩虹璁炬柦鏀瑰杽
-鈥?鏍稿績鎯呮姤鎽樿锛欰I 鍩虹璁炬柦蹇€熸墿寮狅紝澶氫釜鏂版ā鍨嬪拰鍚堜綔椤圭洰娑岀幇锛屽寘鎷?Cerebras 涓?AWS 鐨勫悎浣滀互鍙?NVIDIA 鐨勫紑鏀炬暟鎹鍒掋€?
-馃搸 鏉ユ簮锛?  - Mean CEO: https://blog.mean.ceo/new-ai-model-releases-news-march-2026/
-  - Radical Data Science: https://radicaldatascience.wordpress.com/2026/03/17/ai-news-briefs-bulletin-board-for-march-2026/
-
-----------------------------------------------------------------------
-馃嚭馃嚫 缇庡浗鏀挎不
-----------------------------------------------------------------------
-鈥?鐗规湕鏅?鏈?0鏃ヤ細瑙佸鍥介瀵间汉锛岀缃查拡瀵逛紛鏈楃殑鏂拌鏀夸护
-鈥?鍑哄腑澹叺閬椾綋褰掑浗浠紡锛涗紛鏈楁垬浜夋垚涓虹浜屼换鏈熸牳蹇冭棰?鈥?鏍稿績鎯呮姤鎽樿锛?鏈?0鏃ョ壒鏈楁櫘浼氳鍥介檯棰嗗浜猴紝绛剧讲閽堝浼婃湕濞佽儊鐨勮鏀夸护锛屽苟鍑哄腑浼や骸灏嗗＋褰掑浗浠紡銆?
-馃搸 鏉ユ簮锛?  - CNN: https://www.cnn.com/politics/president-donald-trump-47
-  - AP News: https://apnews.com/hub/donald-trump
-  - 鐧藉: https://www.whitehouse.gov/videos/president-trump-participates-in-a-bilateral-meeting-mar-19-2026/
-
-----------------------------------------------------------------------
-馃挵 甯傚満涓庣粡娴?----------------------------------------------------------------------
-鈥?閬撴寚3鏈?0鏃ヤ笂娑?00+鐐癸紝鏍囨櫘500涓婃定
-鈥?鏍囨櫘500鏃╀簺鏃跺€欏洜浼婃湕鐭虫补鍗辨満鍒涘勾鍐呮柊浣?鈥?娌逛环缁存寔楂樹綅锛汵vidia 鍜屾补浠锋槸鍗庡皵琛楀叧娉ㄧ劍鐐?鈥?鍏ㄧ悆15%鍏崇◣鐢熸晥 鈥?甯傚満娉㈠姩鎸佺画
-
-馃搸 鏉ユ簮锛?  - CNBC: https://www.cnbc.com/2026/03/03/stock-market-today-live-updates.html
-  - CNBC: https://www.cnbc.com/2026/03/12/stock-market-today-live-updates.html
-
-================================================================
-鐢?OpenClaw Agent 鐢熸垚 | Tavily Search API 椹卞姩
 """
+DIAMOND 鏂囩珷缈昏瘧鍣?
+鍏堟彁鐐艰鐐癸紝鍐嶇炕璇戜负绠€浣撲腑鏂?
+姣忕瘒鏂囩珷杈撳嚭 300-500 瀛楃殑涓枃鎽樿
+"""
+import os
+import sys
+import logging
+import requests
+import time
 
-print("=== 姣忔棩绠€鎶ラ偖浠跺彂閫?===")
-print(f"鏀朵欢浜? HZ-lu2007@outlook.com")
-print(f"涓婚: 姣忔棩绠€鎶?{today}")
-print("")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Check for SMTP credentials in .env
-env_path = r"C:\Program Files\QClaw\resources\openclaw\config\skills\imap-smtp-email\.env"
-smtp_host = None
-smtp_user = None
-smtp_pass = None
-smtp_port = 587
-smtp_from = None
+KIMI_API_KEY = os.getenv("kimi_API_KEY")
+KIMI_MODEL = os.getenv("KIMI_MODEL", "moonshotai/kimi-k2.5")
+KIMI_API_URL = os.getenv("KIMI_API_URL", "https://integrate.api.nvidia.com/v1/chat/completions")
 
-if os.path.exists(env_path):
-    print("鎵惧埌 SMTP 閰嶇疆鏂囦欢...")
-    with open(env_path, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith('#') or '=' not in line:
-                continue
-            k, v = line.split('=', 1)
-            k = k.strip()
-            v = v.strip()
-            if k == 'SMTP_HOST': smtp_host = v
-            elif k == 'SMTP_PORT': smtp_port = int(v)
-            elif k == 'SMTP_USER': smtp_user = v
-            elif k == 'SMTP_PASS': smtp_pass = v
-            elif k == 'SMTP_FROM': smtp_from = v
+INPUT_DIR = "dailynews"
+OUTPUT_DIR = "translate"
 
-    print(f"  SMTP_HOST: {'宸查厤缃? if smtp_host else '鏈厤缃?}")
-    print(f"  SMTP_USER: {'宸查厤缃? if smtp_user else '鏈厤缃?}")
-    print(f"  SMTP_PASS: {'宸查厤缃? if smtp_pass else '鏈厤缃?}")
-else:
-    print("鏈壘鍒?SMTP 閰嶇疆鏂囦欢")
+# 鍏堟彁鐐艰鐐癸紝鍐嶇炕璇戜负涓枃
+PROMPT = """浣犳槸涓€浣嶄笓涓氱殑璐㈢粡鏂伴椈缂栬緫銆傝瀵逛互涓嬫棩鏈储缁忔枃绔犲畬鎴愪袱姝ヤ换鍔★細
 
-if not all([smtp_host, smtp_user, smtp_pass]):
-    print("")
-    print("SMTP 鏈畬鏁撮厤缃紝璺宠繃鍙戦€併€傛棩鎶ュ唴瀹瑰涓嬶細")
-    print(report)
-else:
-    try:
-        print("\n姝ｅ湪杩炴帴 SMTP 鏈嶅姟鍣?..")
-        msg = MIMEMultipart()
-        msg['From'] = smtp_from or smtp_user
-        msg['To'] = 'HZ-lu2007@outlook.com'
-        msg['Subject'] = f"姣忔棩绠€鎶?{today}"
-        msg.attach(MIMEText(report, 'plain', 'utf-8'))
+## 绗竴姝ワ細鎻愮偧瑕佺偣
+浠旂粏闃呰鍘熸枃锛屾彁鍙栨渶鏍稿績鐨勪俊鎭偣锛?
+- 鏂囩珷璁ㄨ鐨勬牳蹇冭棰樻槸浠€涔堬紵
+- 鏈夊摢浜涘叧閿暟鎹€佹暟瀛椼€佹帓鍚嶏紵
+- 涓昏瑙傜偣鎴栫粨璁烘槸浠€涔堬紵
+- 瀵硅鑰呮渶閲嶈鐨勫惎绀烘槸浠€涔堬紵
 
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.ehlo()
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(smtp_user, ['HZ-lu2007@outlook.com'], msg.as_string())
-        server.quit()
+## 绗簩姝ワ細缈昏瘧骞剁患杩?
+灏嗘彁鐐肩殑瑕佺偣缈昏瘧涓虹畝浣撲腑鏂囷紝鍐欎綔瑕佹眰锛?
+1. 杈撳嚭 300-500 瀛楃殑涓枃鎽樿
+2. 浣跨敤 Markdown 鏍煎紡锛屼簩绾ф爣棰樹负鏂囩珷鏍囬
+3. 鍦ㄦ爣棰樹笅鏂规敞鏄庡師鏂囬摼鎺?
+4. 鍑嗙‘鎬э細蹇犲疄鍘熸枃锛屼笉閬楁紡鍏抽敭鏁板瓧鍜岀粨璁?
+5. 娴佺晠鎬э細绗﹀悎鐜颁唬绠€浣撲腑鏂囪〃杈撅紝閬垮厤缈昏瘧鑵?
+6. 绠€娲佹€э細涓诲姩鎷嗗垎闀垮彞锛岀簿鐐肩敤璇?
 
-        print("鉁?閭欢鍙戦€佹垚鍔?")
-    except Exception as e:
-        print(f"鉂?鍙戦€佸け璐? {e}")
-        print("")
-        print("鏃ユ姤鍐呭锛?)
-        print(report)
+## 杈撳嚭鏍煎紡
+鐩存帴杈撳嚭涓枃鎽樿锛屼笉瑕佸姞鍏ヤ换浣曟棤鍏冲唴瀹癸紝涓嶈鍐?浠ヤ笅鏄憳瑕?涔嬬被鐨勫墠瑷€"""
+
+
+def summarize_and_translate(content):
+    """璋冪敤 Kimi API 鎻愮偧瑕佺偣骞剁炕璇?""
+    if not KIMI_API_KEY:
+        logging.error("kimi_API_KEY not set")
+        sys.exit(1)
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {KIMI_API_KEY}"
+    }
+    data = {
+        "model": KIMI_MODEL,
+        "messages": [
+            {"role": "system", "content": PROMPT},
+            {"role": "user", "content": content}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 2000
+    }
+
+    for attempt in range(5):
+        try:
+            logging.info(f"[log]")
+            resp = requests.post(
+                KIMI_API_URL,
+                headers=headers,
+                json=data,
+                timeout=300
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            if result.get("choices") and result["choices"][0]:
+                return result["choices"][0]["message"]["content"]
+            else:
+                logging.error(f"[log]")
+                if attempt < 4:
+                    time.sleep(30 * (2 ** attempt))
+        except requests.exceptions.Timeout:
+            logging.error(f"[log]")
+            if attempt < 4:
+                time.sleep(30 * (2 ** attempt))
+        except Exception as e:
+            logging.error(f"[log]")
+            if attempt < 4:
+                time.sleep(30 * (2 ** attempt))
+    return None
+
+
+def translate_file(filepath):
+    """缈昏瘧鍗曚釜鏂囦欢"""
+    if not os.path.exists(filepath):
+        logging.error(f"[log]")
+        return False
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    outpath = os.path.join(OUTPUT_DIR, os.path.basename(filepath))
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    logging.info(f"[log]")
+
+    result = summarize_and_translate(content)
+
+    if result:
+        with open(outpath, 'w', encoding='utf-8') as f:
+            f.write(result)
+        logging.info(f"[log]")
+        return True
+    else:
+        logging.error("Translation failed")
+        return False
+
+
+if __name__ == "__main__":
+    import glob
+    if len(sys.argv) > 1:
+        if os.path.isfile(sys.argv[1]):
+            translate_file(sys.argv[1])
+        else:
+            # 鎸夋枃浠跺悕妯″紡缈昏瘧
+            pattern = os.path.join(INPUT_DIR, sys.argv[1])
+            files = sorted(glob.glob(pattern))
+            for f in files:
+                translate_file(f)
+    else:
+        files = sorted(glob.glob(os.path.join(INPUT_DIR, "*.md")))
+        if files:
+            for f in files:
+                translate_file(f)
+        else:
+            logging.error("No article files found")
