@@ -1,6 +1,7 @@
 """
 DIAMOND RSS Parser
-鎶撳彇 Yahoo News Japan - Diamond 棰戦亾褰撳ぉ鏂囩珷锛屾瘡绡囩嫭绔嬩繚瀛?"""
+鎶撳彇 Yahoo News Japan - Diamond 棰戦亾褰撳ぉ鏂囩珷锛屾瘡绡囩嫭绔嬩繚瀛?娴佺▼锛氬姞杞藉凡鍙戣褰?鈫?鍙彇褰撳ぉ鍊欓€?鈫?鍙栧墠N绡?鈫?鎶撳彇鍐呭 鈫?淇濆瓨
+"""
 import feedparser
 import requests
 from bs4 import BeautifulSoup
@@ -9,9 +10,7 @@ from datetime import datetime
 import os
 import time
 import logging
-import re
 import json
-import glob
 
 # --- 閰嶇疆 ---
 RSS_URL = "https://news.yahoo.co.jp/rss/media/diamond/all.xml"
@@ -21,12 +20,10 @@ MAX_DAILY = 10
 TIMEZONE_TOKYO = pytz.timezone('Asia/Tokyo')
 TIMEZONE_GMT = pytz.utc
 
-# --- 鏃ュ織璁剧疆 ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def load_sent():
-    """鍔犺浇宸插彂閫佽褰?""
     if os.path.exists(SENT_FILE):
         try:
             with open(SENT_FILE, "r", encoding="utf-8") as f:
@@ -36,31 +33,16 @@ def load_sent():
     return set()
 
 
-def save_sent(urls):
-    """淇濆瓨宸插彂閫佽褰?""
-    with open(SENT_FILE, "w", encoding="utf-8") as f:
-        json.dump({"sent": list(urls)}, f, ensure_ascii=False, indent=2)
-
-
 def parse_gmt_date(parsed_struct):
     if not parsed_struct:
         return None
     try:
         import calendar
         timestamp = calendar.timegm(parsed_struct)
-        dt_naive = datetime.utcfromtimestamp(timestamp)
-        return TIMEZONE_GMT.localize(dt_naive)
+        return TIMEZONE_GMT.localize(datetime.utcfromtimestamp(timestamp))
     except Exception as e:
         logging.error(f"瑙ｆ瀽鏃ユ湡鍑洪敊: {e}")
         return None
-
-
-def convert_to_tokyo(dt_gmt):
-    if dt_gmt and dt_gmt.tzinfo:
-        return dt_gmt.astimezone(TIMEZONE_TOKYO)
-    elif dt_gmt:
-        return TIMEZONE_GMT.localize(dt_gmt).astimezone(TIMEZONE_TOKYO)
-    return None
 
 
 def is_today_tokyo(dt_tokyo):
@@ -73,7 +55,7 @@ def is_today_tokyo(dt_tokyo):
 
 
 def scrape_article_content(url):
-    """鎶撳彇鎸囧畾 URL 鐨勬枃绔犲畬鏁村唴瀹?""
+    """鎶撳彇鍗曠瘒鏂囩珷瀹屾暣鍐呭锛堝彧鎶撲竴绡囷級"""
     try:
         base_url = url.replace("?source=rss", "")
         full_content = ""
@@ -83,19 +65,18 @@ def scrape_article_content(url):
             page_url = f"{base_url}?page={page_num}"
             logging.info(f"  鎶撳彇绗瑊page_num}椤? {page_url}")
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-
             resp = requests.get(page_url, headers=headers, timeout=15)
+
             if resp.status_code == 404:
                 logging.info(f"  绗瑊page_num}椤典笉瀛樺湪锛岀粨鏉熷垎椤?)
                 break
             if resp.status_code != 200:
-                logging.error(f"  鎶撳彇澶辫触锛岀姸鎬佺爜: {resp.status_code}")
+                logging.error(f"  鎶撳彇澶辫触: {resp.status_code}")
                 break
 
             resp.encoding = resp.apparent_encoding
             soup = BeautifulSoup(resp.text, 'html.parser')
 
-            # 瀹氫綅鏂囩珷涓讳綋
             article_body = (
                 soup.find('div', class_=lambda x: x and 'article_body' in x.lower()) or
                 soup.find('article') or
@@ -109,15 +90,11 @@ def scrape_article_content(url):
                     return (body_text[:2000] + "...") if body_text else "鏃犳硶鎻愬彇鍐呭"
                 break
 
-            # 绉婚櫎鑴氭湰銆佹牱寮忋€侀摼鎺?            for tag in article_body(['script', 'style', 'a']):
+            for tag in article_body(['script', 'style', 'a']):
                 tag.decompose()
 
             paragraphs = article_body.find_all('p')
-            if paragraphs:
-                parts = [p.get_text(strip=True) for p in paragraphs]
-                page_content = '\n'.join(p for p in parts if p)
-            else:
-                page_content = article_body.get_text(separator='\n', strip=True)
+            page_content = '\n'.join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)) if paragraphs else article_body.get_text(separator='\n', strip=True)
 
             if page_num > 1:
                 full_content += "\n\n"
@@ -128,20 +105,8 @@ def scrape_article_content(url):
 
         return full_content.strip() if full_content else "鏃犳硶鎶撳彇鏂囩珷鍐呭銆?
     except Exception as e:
-        logging.error(f"鎶撳彇鏂囩珷澶辫触 {url}: {e}")
+        logging.error(f"鎶撳彇澶辫触 {url}: {e}")
         return "鏃犳硶鎶撳彇鏂囩珷鍐呭銆?
-
-
-def format_single_article(article):
-    """鏍煎紡鍖栧崟绡囨枃绔?""
-    lines = []
-    lines.append("# " + article['title'])
-    lines.append("*鍙戝竷鏃堕棿: " + article['published_tokyo_str'] + "*")
-    lines.append("[鍘熸枃閾炬帴](" + article['link'] + ")")
-    lines.append("")
-    if article['content']:
-        lines.append(article['content'])
-    return "\n".join(lines)
 
 
 def main():
@@ -150,11 +115,10 @@ def main():
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
-    # 鍔犺浇宸插彂閫佽褰?    sent_urls = load_sent()
+    sent_urls = load_sent()
     logging.info(f"宸插彂閫佽褰? {len(sent_urls)} 绡?)
 
-    # 瑙ｆ瀽 RSS
-    try:
+    # Step 1: 瑙ｆ瀽 RSS锛岃幏鍙栧綋澶╁€欓€夛紙涓嶆姄鍐呭锛屽彧鍙栧厓鏁版嵁锛?    try:
         feed_data = feedparser.parse(RSS_URL)
     except Exception as e:
         logging.error(f"鑾峰彇 RSS 澶辫触: {e}")
@@ -169,14 +133,13 @@ def main():
 
     logging.info(f"RSS 鍏?{len(feed_data.entries)} 鏉?)
 
-    today_articles = []
+    candidates = []
     for entry in feed_data.entries:
-        title = entry.title
         link = entry.link.strip()
 
         # 鍘婚噸
         if link in sent_urls:
-            logging.info(f"宸插彂閫佽繃锛岃烦杩? {title}")
+            logging.info(f"宸插彂閫佽繃锛岃烦杩? {entry.title}")
             continue
 
         pub_parsed = entry.get('published_parsed')
@@ -187,54 +150,59 @@ def main():
         if not dt_gmt:
             continue
 
-        dt_tokyo = convert_to_tokyo(dt_gmt)
-        if not dt_tokyo:
-            continue
-
+        dt_tokyo = dt_gmt.astimezone(TIMEZONE_TOKYO)
         if not is_today_tokyo(dt_tokyo):
             continue
 
-        logging.info(f"澶勭悊鏂囩珷: {title}")
-        content = scrape_article_content(link)
-        time.sleep(0.5)
-
-        today_articles.append({
-            'title': title,
+        candidates.append({
+            'title': entry.title,
             'link': link,
-            'published_tokyo_str': dt_tokyo.strftime('%Y-%m-%d %H:%M:%S %Z%z'),
+            'published_tokyo_str': dt_tokyo.strftime('%Y-%m-%d %H:%M:%S'),
             'published_tokyo_dt': dt_tokyo,
-            'content': content
         })
 
-    if not today_articles:
+    if not candidates:
         logging.info("浠婃棩鏃犳柊鏂囩珷")
-        return
+        return None
 
-    # 鎸夊彂甯冩椂闂存帓搴忥紙鏈€鏂扮殑鍦ㄥ墠锛?    today_articles.sort(key=lambda x: x['published_tokyo_dt'], reverse=True)
+    # Step 2: 鎸夊彂甯冩椂闂存帓搴忥紙鏈€鏂扮殑鍦ㄥ墠锛?    candidates.sort(key=lambda x: x['published_tokyo_dt'], reverse=True)
 
-    # 鍙栨渶澶?MAX_DAILY 绡?    today_articles = today_articles[:MAX_DAILY]
-    today_str = today_articles[0]['published_tokyo_dt'].strftime('%Y%m%d')
+    # Step 3: 鎴彇鏁伴噺涓婇檺
+    top = candidates[:MAX_DAILY]
+    logging.info(f"鍊欓€夋枃绔?{len(candidates)} 绡囷紝鎴彇鍓?{len(top)} 绡?)
 
-    logging.info(f"浠婃棩鏂版枃绔犲叡 {len(today_articles)} 绡囷紝寮€濮嬩繚瀛?..")
+    # Step 4: 鍙姄杩?top 绡囩殑鍐呭
+    today_str = top[0]['published_tokyo_dt'].strftime('%Y%m%d')
+    saved_files = []
 
-    # 淇濆瓨姣忕瘒鏂囩珷涓虹嫭绔嬫枃浠?    saved_files = []
-    for i, article in enumerate(today_articles):
+    for i, article in enumerate(top):
+        logging.info(f"鎶撳彇鏂囩珷 ({i+1}/{len(top)}): {article['title']}")
+        article['content'] = scrape_article_content(article['link'])
+        time.sleep(0.5)
+
+        # 淇濆瓨鐙珛鏂囦欢
         filename = f"{today_str}_art{i + 1}.md"
         filepath = os.path.join(OUTPUT_DIR, filename)
         with open(filepath, "w", encoding="utf-8") as f:
-            f.write(format_single_article(article))
+            f.write("# " + article['title'] + "\n\n")
+            f.write(f"*鍙戝竷鏃堕棿: {article['published_tokyo_str']}*\n")
+            f.write(f"[鍘熸枃閾炬帴]({article['link']})\n\n")
+            f.write(article['content'] + "\n")
+
         logging.info(f"淇濆瓨: {filepath}")
         saved_files.append((filepath, article['link']))
 
-    # 鍚屾椂淇濆瓨鑱氬悎鏂囦欢锛堟柟渚胯皟璇曪級
+    # 淇濆瓨鑱氬悎鏂囦欢锛堟柟渚胯皟璇曪級
     agg_file = os.path.join(OUTPUT_DIR, f"{today_str}.md")
     with open(agg_file, "w", encoding="utf-8") as f:
-        f.write(f"# DIAMOND {today_str} 鏂伴椈 ({len(today_articles)} 绡?\n\n")
-        for i, article in enumerate(today_articles):
-            f.write(format_single_article(article))
-            f.write("\n\n---\n\n")
+        f.write(f"# DIAMOND {today_str} 鏂伴椈 ({len(top)} 绡?\n\n---\n\n")
+        for article in top:
+            f.write(f"## {article['title']}\n\n")
+            f.write(f"*鍙戝竷鏃堕棿: {article['published_tokyo_str']}*\n")
+            f.write(f"[鍘熸枃閾炬帴]({article['link']})\n\n")
+            f.write(f"{article['content']}\n\n---\n\n")
 
-    logging.info(f"鍏变繚瀛?{len(saved_files)} 绡囨枃绔?)
+    logging.info(f"瀹屾垚锛屽叡淇濆瓨 {len(saved_files)} 绡囨枃绔?)
     return saved_files
 
 
