@@ -2,9 +2,7 @@
 DIAMOND daily task entry point
 Fetch today articles -> dedup (max 10) -> summarize+translate -> one email
 """
-import os
-import glob
-import json
+import os, glob, json
 from datetime import datetime
 import pytz
 
