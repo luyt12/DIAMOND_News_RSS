@@ -1,7 +1,6 @@
 """
-DIAMOND 鏂囩珷缈昏瘧鍣?
-鍏堟彁鐐艰鐐癸紝鍐嶇炕璇戜负绠€浣撲腑鏂?
-姣忕瘒鏂囩珷杈撳嚭 300-500 瀛楃殑涓枃鎽樿
+DIAMOND article translator
+Summarize and translate Japanese articles to Chinese
 """
 import os
 import sys
@@ -18,31 +17,29 @@ KIMI_API_URL = os.getenv("KIMI_API_URL", "https://integrate.api.nvidia.com/v1/ch
 INPUT_DIR = "dailynews"
 OUTPUT_DIR = "translate"
 
-# 鍏堟彁鐐艰鐐癸紝鍐嶇炕璇戜负涓枃
-PROMPT = """浣犳槸涓€浣嶄笓涓氱殑璐㈢粡鏂伴椈缂栬緫銆傝瀵逛互涓嬫棩鏈储缁忔枃绔犲畬鎴愪袱姝ヤ换鍔★細
+PROMPT = """You are a professional financial news editor. Please complete two tasks on the Japanese article below:
 
-## 绗竴姝ワ細鎻愮偧瑕佺偣
-浠旂粏闃呰鍘熸枃锛屾彁鍙栨渶鏍稿績鐨勪俊鎭偣锛?
-- 鏂囩珷璁ㄨ鐨勬牳蹇冭棰樻槸浠€涔堬紵
-- 鏈夊摢浜涘叧閿暟鎹€佹暟瀛椼€佹帓鍚嶏紵
-- 涓昏瑙傜偣鎴栫粨璁烘槸浠€涔堬紵
-- 瀵硅鑰呮渶閲嶈鐨勫惎绀烘槸浠€涔堬紵
+## Task 1: Extract Key Points
+Read the original text carefully and extract the most important information:
+- What is the core topic or argument?
+- What key data, numbers, or rankings are mentioned?
+- What are the main conclusions?
+- What is the most important takeaway for readers?
 
-## 绗簩姝ワ細缈昏瘧骞剁患杩?
-灏嗘彁鐐肩殑瑕佺偣缈昏瘧涓虹畝浣撲腑鏂囷紝鍐欎綔瑕佹眰锛?
-1. 杈撳嚭 300-500 瀛楃殑涓枃鎽樿
-2. 浣跨敤 Markdown 鏍煎紡锛屼簩绾ф爣棰樹负鏂囩珷鏍囬
-3. 鍦ㄦ爣棰樹笅鏂规敞鏄庡師鏂囬摼鎺?
-4. 鍑嗙‘鎬э細蹇犲疄鍘熸枃锛屼笉閬楁紡鍏抽敭鏁板瓧鍜岀粨璁?
-5. 娴佺晠鎬э細绗﹀悎鐜颁唬绠€浣撲腑鏂囪〃杈撅紝閬垮厤缈昏瘧鑵?
-6. 绠€娲佹€э細涓诲姩鎷嗗垎闀垮彞锛岀簿鐐肩敤璇?
+## Task 2: Translate and Summarize
+Translate the extracted key points into Simplified Chinese with these requirements:
+1. Output 300-500 characters in Chinese summary
+2. Use Markdown format, second-level heading for article title
+3. Include original article link below the title
+4. Accuracy: faithful to original, preserve key data and conclusions
+5. Fluency: natural modern Chinese, avoid translationese
+6. Conciseness: break long sentences, use precise language
 
-## 杈撳嚭鏍煎紡
-鐩存帴杈撳嚭涓枃鎽樿锛屼笉瑕佸姞鍏ヤ换浣曟棤鍏冲唴瀹癸紝涓嶈鍐?浠ヤ笅鏄憳瑕?涔嬬被鐨勫墠瑷€"""
+## Output Format
+Output the Chinese summary directly, no introductions or meta-comments."""
 
 
 def summarize_and_translate(content):
-    """璋冪敤 Kimi API 鎻愮偧瑕佺偣骞剁炕璇?""
     if not KIMI_API_KEY:
         logging.error("kimi_API_KEY not set")
         sys.exit(1)
@@ -63,7 +60,7 @@ def summarize_and_translate(content):
 
     for attempt in range(5):
         try:
-            logging.info(f"[log]")
+            logging.info(f"Submitting summarize+translate (attempt {attempt + 1}/5)...")
             resp = requests.post(
                 KIMI_API_URL,
                 headers=headers,
@@ -75,24 +72,23 @@ def summarize_and_translate(content):
             if result.get("choices") and result["choices"][0]:
                 return result["choices"][0]["message"]["content"]
             else:
-                logging.error(f"[log]")
+                logging.error(f"API response error: {result}")
                 if attempt < 4:
                     time.sleep(30 * (2 ** attempt))
         except requests.exceptions.Timeout:
-            logging.error(f"[log]")
+            logging.error(f"API timeout (attempt {attempt + 1}/5)")
             if attempt < 4:
                 time.sleep(30 * (2 ** attempt))
         except Exception as e:
-            logging.error(f"[log]")
+            logging.error(f"Request failed: {e}")
             if attempt < 4:
                 time.sleep(30 * (2 ** attempt))
     return None
 
 
 def translate_file(filepath):
-    """缈昏瘧鍗曚釜鏂囦欢"""
     if not os.path.exists(filepath):
-        logging.error(f"[log]")
+        logging.error(f"File not found: {filepath}")
         return False
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -101,14 +97,13 @@ def translate_file(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    logging.info(f"[log]")
-
+    logging.info(f"Starting summarize+translate: {filepath} ({len(content)} chars)")
     result = summarize_and_translate(content)
 
     if result:
         with open(outpath, 'w', encoding='utf-8') as f:
             f.write(result)
-        logging.info(f"[log]")
+        logging.info(f"Done: {outpath} ({len(result)} chars)")
         return True
     else:
         logging.error("Translation failed")
@@ -121,9 +116,7 @@ if __name__ == "__main__":
         if os.path.isfile(sys.argv[1]):
             translate_file(sys.argv[1])
         else:
-            # 鎸夋枃浠跺悕妯″紡缈昏瘧
-            pattern = os.path.join(INPUT_DIR, sys.argv[1])
-            files = sorted(glob.glob(pattern))
+            files = sorted(glob.glob(os.path.join(INPUT_DIR, sys.argv[1])))
             for f in files:
                 translate_file(f)
     else:
