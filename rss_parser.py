@@ -1,110 +1,168 @@
-import smtplib
-import os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+"""
+DIAMOND RSS Parser
+Fetch today articles, dedup, save each separately
+"""
+import feedparser, requests, pytz, json, time, logging
+from bs4 import BeautifulSoup
 from datetime import datetime
 
-today = datetime.now().strftime('%Y-%m-%d')
+RSS_URL = "https://news.yahoo.co.jp/rss/media/diamond/all.xml"
+OUTPUT_DIR = "dailynews"
+SENT_FILE = "sent_articles.json"
+MAX_DAILY = 10
+TZ_TOKYO = pytz.timezone("Asia/Tokyo")
+TZ_GMT = pytz.utc
 
-report = f"""馃摪 姣忔棩绠€鎶?鈥?{today}
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-================================================================
-馃實 鍦扮紭鏀挎不锛氱編浼婃垬浜夛紙绗?0澶╋級
-----------------------------------------------------------------------
-鈥?缇庡浗鍜屼互鑹插垪鑱斿悎鎵撳嚮浼婃湕澧冨唴鍐涗簨鐩爣锛屼互鑹插垪琚嚮浜嗗崡甯曞皵鏂ぉ鐒舵皵鐢?鈥?娌逛环椋欏崌 鈥?鍏ㄧ悆鑳芥簮甯傚満鍙楀埌閲嶅ぇ鍐插嚮
-鈥?鐗规湕鏅細"涓嶄細鍚戜紛鏈楁淳閬ｅ湴闈㈤儴闃?
-鈥?鏍稿績鎯呮姤鎽樿锛氱編浠ュ啿绐佺20澶╋紝缇庡啗娣卞叆鎵撳嚮浼婃湕澧冨唴鍐涗簨鐩爣锛屼互鑹插垪琚嚮鍗楀笗灏旀柉姘旂敯瀵艰嚧鑳芥簮浠锋牸鏆存定銆?
-馃搸 鏉ユ簮锛?  - CNN: https://www.cnn.com/2026/03/19/middleeast/us-israel-iran-middle-east-war-day-20-what-we-know-intl-hnk
-  - Al Jazeera: https://www.aljazeera.com/video/newsfeed/2026/3/20/unpacking-netanyahus-latest-claims-about-the-war-on-iran
-  - Fox News: https://www.foxnews.com/video/6391246686112
 
-----------------------------------------------------------------------
-馃 AI 涓庣鎶€
-----------------------------------------------------------------------
-鈥?AI 鍩虹璁炬柦蹇€熸墿寮?鈥?Cerebras 鐧婚檰 AWS銆丯VIDIA 寮€鏀炬暟鎹鍒?鈥?2026骞?鏈堝涓柊 AI 妯″瀷鍙戝竷锛涘垵鍒涘叕鍙稿彈鐩婁簬鍩虹璁炬柦鏀瑰杽
-鈥?鏍稿績鎯呮姤鎽樿锛欰I 鍩虹璁炬柦蹇€熸墿寮狅紝澶氫釜鏂版ā鍨嬪拰鍚堜綔椤圭洰娑岀幇锛屽寘鎷?Cerebras 涓?AWS 鐨勫悎浣滀互鍙?NVIDIA 鐨勫紑鏀炬暟鎹鍒掋€?
-馃搸 鏉ユ簮锛?  - Mean CEO: https://blog.mean.ceo/new-ai-model-releases-news-march-2026/
-  - Radical Data Science: https://radicaldatascience.wordpress.com/2026/03/17/ai-news-briefs-bulletin-board-for-march-2026/
+def load_sent():
+    if os.path.exists(SENT_FILE):
+        try:
+            with open(SENT_FILE, "r", encoding="utf-8") as f:
+                return set(json.load(f).get("sent", []))
+        except Exception:
+            pass
+    return set()
 
-----------------------------------------------------------------------
-馃嚭馃嚫 缇庡浗鏀挎不
-----------------------------------------------------------------------
-鈥?鐗规湕鏅?鏈?0鏃ヤ細瑙佸鍥介瀵间汉锛岀缃查拡瀵逛紛鏈楃殑鏂拌鏀夸护
-鈥?鍑哄腑澹叺閬椾綋褰掑浗浠紡锛涗紛鏈楁垬浜夋垚涓虹浜屼换鏈熸牳蹇冭棰?鈥?鏍稿績鎯呮姤鎽樿锛?鏈?0鏃ョ壒鏈楁櫘浼氳鍥介檯棰嗗浜猴紝绛剧讲閽堝浼婃湕濞佽儊鐨勮鏀夸护锛屽苟鍑哄腑浼や骸灏嗗＋褰掑浗浠紡銆?
-馃搸 鏉ユ簮锛?  - CNN: https://www.cnn.com/politics/president-donald-trump-47
-  - AP News: https://apnews.com/hub/donald-trump
-  - 鐧藉: https://www.whitehouse.gov/videos/president-trump-participates-in-a-bilateral-meeting-mar-19-2026/
 
-----------------------------------------------------------------------
-馃挵 甯傚満涓庣粡娴?----------------------------------------------------------------------
-鈥?閬撴寚3鏈?0鏃ヤ笂娑?00+鐐癸紝鏍囨櫘500涓婃定
-鈥?鏍囨櫘500鏃╀簺鏃跺€欏洜浼婃湕鐭虫补鍗辨満鍒涘勾鍐呮柊浣?鈥?娌逛环缁存寔楂樹綅锛汵vidia 鍜屾补浠锋槸鍗庡皵琛楀叧娉ㄧ劍鐐?鈥?鍏ㄧ悆15%鍏崇◣鐢熸晥 鈥?甯傚満娉㈠姩鎸佺画
-
-馃搸 鏉ユ簮锛?  - CNBC: https://www.cnbc.com/2026/03/03/stock-market-today-live-updates.html
-  - CNBC: https://www.cnbc.com/2026/03/12/stock-market-today-live-updates.html
-
-================================================================
-鐢?OpenClaw Agent 鐢熸垚 | Tavily Search API 椹卞姩
-"""
-
-print("=== 姣忔棩绠€鎶ラ偖浠跺彂閫?===")
-print(f"鏀朵欢浜? HZ-lu2007@outlook.com")
-print(f"涓婚: 姣忔棩绠€鎶?{today}")
-print("")
-
-# Check for SMTP credentials in .env
-env_path = r"C:\Program Files\QClaw\resources\openclaw\config\skills\imap-smtp-email\.env"
-smtp_host = None
-smtp_user = None
-smtp_pass = None
-smtp_port = 587
-smtp_from = None
-
-if os.path.exists(env_path):
-    print("鎵惧埌 SMTP 閰嶇疆鏂囦欢...")
-    with open(env_path, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith('#') or '=' not in line:
-                continue
-            k, v = line.split('=', 1)
-            k = k.strip()
-            v = v.strip()
-            if k == 'SMTP_HOST': smtp_host = v
-            elif k == 'SMTP_PORT': smtp_port = int(v)
-            elif k == 'SMTP_USER': smtp_user = v
-            elif k == 'SMTP_PASS': smtp_pass = v
-            elif k == 'SMTP_FROM': smtp_from = v
-
-    print(f"  SMTP_HOST: {'宸查厤缃? if smtp_host else '鏈厤缃?}")
-    print(f"  SMTP_USER: {'宸查厤缃? if smtp_user else '鏈厤缃?}")
-    print(f"  SMTP_PASS: {'宸查厤缃? if smtp_pass else '鏈厤缃?}")
-else:
-    print("鏈壘鍒?SMTP 閰嶇疆鏂囦欢")
-
-if not all([smtp_host, smtp_user, smtp_pass]):
-    print("")
-    print("SMTP 鏈畬鏁撮厤缃紝璺宠繃鍙戦€併€傛棩鎶ュ唴瀹瑰涓嬶細")
-    print(report)
-else:
+def parse_gmt(ps):
+    if not ps:
+        return None
     try:
-        print("\n姝ｅ湪杩炴帴 SMTP 鏈嶅姟鍣?..")
-        msg = MIMEMultipart()
-        msg['From'] = smtp_from or smtp_user
-        msg['To'] = 'HZ-lu2007@outlook.com'
-        msg['Subject'] = f"姣忔棩绠€鎶?{today}"
-        msg.attach(MIMEText(report, 'plain', 'utf-8'))
+        import calendar
+        return TZ_GMT.localize(datetime.utcfromtimestamp(calendar.timegm(ps)))
+    except Exception:
+        return None
 
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.ehlo()
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(smtp_user, ['HZ-lu2007@outlook.com'], msg.as_string())
-        server.quit()
 
-        print("鉁?閭欢鍙戦€佹垚鍔?")
+def is_today(dt):
+    if not dt:
+        return False
+    now = datetime.now(TZ_TOKYO)
+    return dt.year == now.year and dt.month == now.month and dt.day == now.day
+
+
+def fetch_content(url):
+    try:
+        base = url.replace("?source=rss", "")
+        full = ""
+        page = 1
+        while True:
+            page_url = "%s?page=%s" % (base, page)
+            logging.info("Fetching page %s: %s", page, page_url)
+            resp = requests.get(page_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            if resp.status_code == 404:
+                logging.info("Page %s not found, done", page)
+                break
+            if resp.status_code != 200:
+                logging.error("Fetch failed: %s", resp.status_code)
+                break
+            resp.encoding = resp.apparent_encoding
+            soup = BeautifulSoup(resp.text, "html.parser")
+            body = (
+                soup.find("div", class_=lambda x: x and "article_body" in x.lower()) or
+                soup.find("article") or
+                soup.find("div", id="uamods-pickup") or
+                soup.find("div", class_="articleBody")
+            )
+            if not body:
+                if page == 1:
+                    txt = soup.body.get_text(separator="\n", strip=True) if soup.body else ""
+                    return (txt[:2000] + "...") if txt else "Could not extract"
+                break
+            for tag in body(["script", "style", "a"]):
+                tag.decompose()
+            paras = body.find_all("p")
+            content = "\n".join(p.get_text(strip=True) for p in paras if p.get_text(strip=True)) if paras else body.get_text(separator="\n", strip=True)
+            if page > 1:
+                full += "\n\n"
+            full += content
+            page += 1
+            time.sleep(0.5)
+        return full.strip() if full else "Could not fetch content"
     except Exception as e:
-        print(f"鉂?鍙戦€佸け璐? {e}")
-        print("")
-        print("鏃ユ姤鍐呭锛?)
-        print(report)
+        logging.error("Fetch failed %s: %s", url, e)
+        return "Could not fetch content"
+
+
+def main():
+    logging.info("Starting DIAMOND RSS...")
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+
+    sent_urls = load_sent()
+    logging.info("Already sent: %s articles", len(sent_urls))
+
+    try:
+        feed_data = feedparser.parse(RSS_URL)
+    except Exception as e:
+        logging.error("Failed to get RSS: %s", e)
+        return
+
+    if feed_data.bozo:
+        logging.warning("RSS format warning: %s", feed_data.bozo_exception)
+    if not feed_data.entries:
+        logging.info("RSS has no entries")
+        return
+
+    logging.info("RSS total: %s entries", len(feed_data.entries))
+
+    candidates = []
+    for entry in feed_data.entries:
+        link = entry.link.strip()
+        if link in sent_urls:
+            logging.info("Already sent, skip: %s", entry.title)
+            continue
+        ps = entry.get("published_parsed")
+        if not ps:
+            continue
+        dt_gmt = parse_gmt(ps)
+        if not dt_gmt:
+            continue
+        dt_tokyo = dt_gmt.astimezone(TZ_TOKYO)
+        if not is_today(dt_tokyo):
+            continue
+        candidates.append({"title": entry.title, "link": link, "pub_str": dt_tokyo.strftime("%Y-%m-%d %H:%M:%S"), "pub_dt": dt_tokyo})
+
+    if not candidates:
+        logging.info("No new articles today")
+        return None
+
+    candidates.sort(key=lambda x: x["pub_dt"], reverse=True)
+    top = candidates[:MAX_DAILY]
+    logging.info("Candidates: %s, limited to top %s", len(candidates), len(top))
+
+    today_str = top[0]["pub_dt"].strftime("%Y%m%d")
+    saved = []
+
+    for i, article in enumerate(top):
+        logging.info("Fetching article (%s/%s): %s", i + 1, len(top), article["title"])
+        article["content"] = fetch_content(article["link"])
+        time.sleep(0.5)
+
+        fname = "%s_art%s.md" % (today_str, i + 1)
+        fpath = os.path.join(OUTPUT_DIR, fname)
+        with open(fpath, "w", encoding="utf-8") as f:
+            f.write("# " + article["title"] + "\n\n")
+            f.write("*Published: " + article["pub_str"] + "*\n")
+            f.write("[Source](" + article["link"] + ")\n\n")
+            f.write(article.get("content", "") + "\n")
+        logging.info("Saved: %s", fpath)
+        saved.append((fpath, article["link"]))
+
+    agg = os.path.join(OUTPUT_DIR, today_str + ".md")
+    with open(agg, "w", encoding="utf-8") as f:
+        f.write("# DIAMOND %s (%s articles)\n\n---\n\n" % (today_str, len(top)))
+        for article in top:
+            f.write("## " + article["title"] + "\n\n")
+            f.write("*Published: " + article["pub_str"] + "*\n")
+            f.write("[Source](" + article["link"] + ")\n\n")
+            f.write(article.get("content", "") + "\n\n---\n\n")
+
+    logging.info("Done, saved %s articles", len(saved))
+    return saved
+
+
+if __name__ == "__main__":
+    main()
