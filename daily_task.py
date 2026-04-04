@@ -1,7 +1,6 @@
 """
-DIAMOND 每日任务入口脚本
-每天只翻译当天最新的 3 篇文章标题+摘要，避免内容过长
-"""
+DIAMOND 姣忔棩浠诲姟鍏ュ彛鑴氭湰
+姣忓ぉ鎶撳彇鏂伴椈锛岀炕璇戝綋澶╂渶鏂扮殑3绡囨枃绔狅紝姣忕瘒鍗曠嫭鍙戦€佷竴灏侀偖浠?"""
 import os
 import re
 import glob
@@ -11,28 +10,29 @@ import pytz
 tz_est = pytz.timezone("America/New_York")
 today = datetime.now(tz_est).strftime("%Y%m%d")
 
-# Step 1: 抓取新闻
-print("Step 1: 抓取新闻...")
+# Step 1: 鎶撳彇鏂伴椈
+print("Step 1: 鎶撳彇鏂伴椈...")
 import rss_parser
 rss_parser.main()
 
-# Step 2: 只翻译今日最新 3 篇文章（仅标题+摘要，不含全文）
-print("Step 2: 翻译今日最新 3 篇文章（标题+摘要）...")
+# Step 2: 璇诲彇褰撳ぉ鏂伴椈锛屾媶鍒嗘垚3绡囩嫭绔嬫枃浠讹紝鍒嗗埆缈昏瘧锛屾瘡绡囧彂涓€灏侀偖浠?print("Step 2: 缈昏瘧骞跺彂閫佸綋鏃?绡囨枃绔?..")
 dailynews_file = os.path.join("dailynews", today + ".md")
 
 import translate_news
 
 if not os.path.exists(dailynews_file):
-    print("No today file: " + dailynews_file)
     files = sorted(glob.glob("dailynews/*.md"))
-    print("Available: " + str(files[-5:]))
-else:
+    if not files:
+        print("No dailynews file found at all")
+    else:
+        dailynews_file = files[-1]
+        print("Using latest: " + dailynews_file)
+
+if os.path.exists(dailynews_file):
     with open(dailynews_file, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 按文章分割（每篇文章以 "## 文章" 或 "标题：" 开头）
-    # DIAMOND rss_parser 格式：每篇文章之间用 "---" 分隔
-    raw_articles = content.split("---")
+    # 鎸?"---" 鍒嗛殧鎴愮嫭绔嬫枃绔?    raw_articles = content.split("---")
     articles = []
     for raw in raw_articles:
         raw = raw.strip()
@@ -42,68 +42,53 @@ else:
 
     print("Total articles: " + str(len(articles)))
 
-    # 取最新的 3 篇
-    top3 = articles[-3:]
-    print("Using latest " + str(len(top3)) + " articles")
+    # 鍙栨渶鏂?绡囷紙鏁扮粍鏈熬3涓級
+    top3 = articles[-3:] if len(articles) >= 3 else articles
+    print("Translating " + str(len(top3)) + " articles")
 
-    # 只保留每篇文章的前 500 字符（标题+摘要），去掉全文
-    truncated = []
-    for art in top3:
-        lines = art.split("\n")
-        # 取前 10 行或 500 字符，以较小者为准
-        short = "\n".join(lines[:10])
-        if len(short) > 500:
-            short = short[:500] + "..."
-        truncated.append(short)
-
-    combined = "\n\n---\n\n".join(truncated)
-    print("Combined length: " + str(len(combined)) + " chars")
-
-    temp_file = os.path.join("dailynews", today + "_top3.md")
-    with open(temp_file, "w", encoding="utf-8") as f:
-        f.write(combined)
-
-    success = translate_news.translate_file(temp_file)
-
-    # 翻译结果写入 translate/{today}.md
-    os.makedirs("translate", exist_ok=True)
-    translate_output = os.path.join("translate", today + ".md")
-    translated_temp = os.path.join("translate", today + "_top3.md")
-
-    if success and os.path.exists(translated_temp):
-        with open(translated_temp, "r", encoding="utf-8") as f:
-            new_content = f.read()
-        if os.path.exists(translate_output):
-            with open(translate_output, "r", encoding="utf-8") as f:
-                existing = f.read()
-            combined_trans = existing + "\n\n---\n\n" + new_content
-        else:
-            combined_trans = new_content
-        with open(translate_output, "w", encoding="utf-8") as f:
-            f.write(combined_trans)
-        print("Translated saved: " + translate_output)
-        os.remove(translated_temp)
-    else:
-        print("Translation failed")
-
-    if os.path.exists(temp_file):
-        os.remove(temp_file)
-
-# Step 3: 发送今日邮件
-print("Step 3: 发送今日邮件...")
-translate_path = os.path.join("translate", today + ".md")
-if not os.path.exists(translate_path):
-    t_files = sorted(glob.glob("translate/*.md"))
-    if t_files:
-        translate_path = t_files[-1]
-        print("Using latest: " + translate_path)
-    else:
-        translate_path = None
-
-if translate_path and os.path.exists(translate_path):
     import send_email
-    send_email.main(translate_path)
+
+    success_count = 0
+    for i, art in enumerate(top3):
+        art_num = i + 1
+        # 淇濆瓨涓虹嫭绔嬫枃浠讹紙鍙惈杩欎竴绡囷級
+        single_file = os.path.join("dailynews", today + "_art" + str(art_num) + ".md")
+        with open(single_file, "w", encoding="utf-8") as f:
+            f.write(art)
+        print("Saved article " + str(art_num) + ": " + single_file)
+
+        # 缈昏瘧
+        ok = translate_news.translate_file(single_file)
+        if not ok:
+            print("Translation failed for article " + str(art_num))
+            # 娓呯悊涓存椂鏂囦欢
+            if os.path.exists(single_file):
+                os.remove(single_file)
+            continue
+
+        # 缈昏瘧缁撴灉璺緞
+        translated_file = os.path.join("translate", today + "_art" + str(art_num) + ".md")
+
+        # 娓呯悊鍘熷涓存椂鏂囦欢
+        if os.path.exists(single_file):
+            os.remove(single_file)
+
+        # 鍙戦€侀偖浠?        if os.path.exists(translated_file):
+            try:
+                send_email.main(translated_file)
+                print("Email sent for article " + str(art_num))
+                success_count += 1
+            except Exception as e:
+                print("Email send error: " + str(e))
+            # 缈昏瘧鍚庣殑涓存椂鏂囦欢涔熸竻鐞?            try:
+                os.remove(translated_file)
+            except Exception:
+                pass
+        else:
+            print("Translated file not found: " + translated_file)
+
+    print("Successfully sent " + str(success_count) + "/" + str(len(top3)) + " emails")
 else:
-    print("No translate file, skip email")
+    print("No dailynews file found: " + dailynews_file)
 
 print("Done!")
