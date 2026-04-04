@@ -1,7 +1,11 @@
 """
-DIAMOND News Email Sender - POLITICO style
+DIAMOND News Email Sender - 缇庡寲鐗?灏嗗绡囨枃绔犳憳瑕佸悎骞朵负涓€涓簿缇庣殑 HTML 閭欢
 """
-import os, sys, re, smtplib, ssl
+import os
+import sys
+import re
+import smtplib
+import ssl
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -13,59 +17,256 @@ SMTP_PORT = int(os.getenv("SMTP_PORT") or "465")
 SMTP_USER = os.getenv("SMTP_USER") or ""
 SMTP_PASS = os.getenv("SMTP_PASS") or ""
 
-_missing = [k for k, v in {"EMAIL_TO": EMAIL_TO, "EMAIL_FROM": EMAIL_FROM, "SMTP_HOST": SMTP_HOST, "SMTP_USER": SMTP_USER, "SMTP_PASS": SMTP_PASS}.items() if not v]
+_missing = [k for k, v in {
+    "EMAIL_TO": EMAIL_TO, "EMAIL_FROM": EMAIL_FROM,
+    "SMTP_HOST": SMTP_HOST, "SMTP_USER": SMTP_USER, "SMTP_PASS": SMTP_PASS
+}.items() if not v]
 if _missing:
-    print("ERROR: Missing required env vars: " + ", ".join(_missing))
+    print("ERROR: Missing env vars: " + ", ".join(_missing))
     sys.exit(1)
-TRANSLATE_DIR = "translate"
 
 
-def format_html(content, date_str):
+def extract_date(filepath):
+    m = re.search(r"(\d{8})", filepath)
+    return m.group(1) if m else datetime.now().strftime("%Y%m%d")
+
+
+def make_html(combined_content, date_str):
+    """
+    浼犲叆鐨勬槸澶氱瘒鏂囩珷鎽樿鍚堝苟鐨?Markdown 鍐呭銆?    瑙ｆ瀽姣忕瘒锛堜互 ## 鏍囬 鍒嗗壊锛夛紝娓叉煋涓虹簿缇庣殑 HTML銆?    """
     import markdown
-    html_body = markdown.markdown(content, extensions=['tables', 'fenced_code'])
-    date_fmt = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
-    html = (
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
-        "<style>" +
-        "body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;line-height:1.6;color:#333;max-width:800px;margin:0 auto;padding:20px;background:#f5f5f5}" +
-        ".container{background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}" +
-        ".header{border-bottom:3px solid #c41230;padding-bottom:15px;margin-bottom:20px}" +
-        "h1{color:#c41230;margin:0;font-size:24px}" +
-        ".date{color:#666;font-size:14px;margin-top:5px}" +
-        "h2{color:#1a1a1a;border-top:1px solid #e0e0e0;padding-top:20px;margin-top:30px;font-size:18px}" +
-        "a{color:#0066cc;text-decoration:none}" +
-        "p{margin:8px 0;color:#444;font-size:15px;line-height:1.7}" +
-        "hr{border:none;border-top:1px solid #e0e0e0;margin:25px 0}" +
-        ".footer{margin-top:40px;padding-top:20px;border-top:1px solid #e0e0e0;font-size:12px;color:#888;text-align:center}" +
-        "</style></head><body>" +
-        "<div class=\"container\">" +
-        "<div class=\"header\"><h1>DIAMOND Finance Daily</h1><div class=\"date\">" + date_fmt + "</div></div>" +
-        "<div class=\"content\">" + html_body + "</div>" +
-        "<div class=\"footer\">Auto-sent by OpenClaw Agent</div></div></body></html>"
-    )
+
+    date_fmt = datetime.strptime(date_str, "%Y%m%d").strftime("%Y骞?m鏈?d鏃?)
+
+    # 鍒嗗壊姣忕瘒鏂囩珷锛堜互 ## 寮€澶村嵆涓烘柊鏂囩珷锛?    sections = re.split(r"\n(?=## )", combined_content.strip())
+
+    articles_html = ""
+    for i, section in enumerate(sections):
+        section = section.strip()
+        if not section:
+            continue
+
+        # 灏?Markdown 杞负 HTML锛堝彧澶勭悊鏍囬鍜屾钀斤級
+        article_html = markdown.markdown(
+            section,
+            extensions=['fenced_code', 'tables'],
+            output_format='html'
+        )
+
+        articles_html += f"""
+        <div class="article{' odd' if i % 2 == 0 else ''}">
+            {article_html}
+        </div>"""
+
+    html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIAMOND 璐㈢粡鏃ユ姤 - {date_fmt}</title>
+<style>
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{
+    background: #f0f2f5;
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+    color: #1a1a1a;
+    padding: 20px 0;
+  }}
+  .wrapper {{
+    max-width: 680px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }}
+  /* 鎶ュご */
+  .header {{
+    background: linear-gradient(135deg, #c41230 0%, #8b0000 100%);
+    color: #fff;
+    padding: 32px 40px;
+    position: relative;
+  }}
+  .header::after {{
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    left: 0; right: 0;
+    height: 20px;
+    background: linear-gradient(to bottom right, #8b0000 0%, #8b0000 50%, transparent 50%);
+  }}
+  .header-inner {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }}
+  .header h1 {{
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }}
+  .header .subtitle {{
+    font-size: 14px;
+    opacity: 0.85;
+    margin-top: 4px;
+  }}
+  .header .date-badge {{
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    text-align: center;
+  }}
+  .header .date-badge span {{
+    display: block;
+    font-size: 11px;
+    opacity: 0.7;
+    margin-bottom: 2px;
+  }}
+  /* 鏂囩珷璁℃暟 */
+  .meta-bar {{
+    background: #fafafa;
+    border-bottom: 1px solid #eee;
+    padding: 12px 40px;
+    font-size: 13px;
+    color: #888;
+  }}
+  /* 鏂囩珷鍒楄〃 */
+  .articles {{
+    padding: 32px 40px 40px;
+  }}
+  .article {{
+    margin-bottom: 36px;
+    padding-bottom: 36px;
+    border-bottom: 1px solid #f0f0f0;
+  }}
+  .article:last-child {{
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }}
+  /* 鏂囩珷鏍囬 */
+  .article h2 {{
+    font-size: 17px;
+    font-weight: 600;
+    color: #1a1a1a;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    padding-left: 14px;
+    border-left: 4px solid #c41230;
+  }}
+  /* 鏂囩珷姝ｆ枃 */
+  .article p {{
+    font-size: 15px;
+    line-height: 1.85;
+    color: #3a3a3a;
+    margin-bottom: 10px;
+  }}
+  /* 閾炬帴 */
+  .article a {{
+    color: #c41230;
+    text-decoration: none;
+    font-weight: 500;
+  }}
+  .article a:hover {{
+    text-decoration: underline;
+  }}
+  /* 鍘熸枃閾炬帴鍖哄潡 */
+  .article em:has(a) {{
+    display: block;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #aaa;
+    font-style: normal;
+  }}
+  /* 鍒楄〃 */
+  .article ul, .article ol {{
+    padding-left: 24px;
+    margin: 8px 0;
+  }}
+  .article li {{
+    font-size: 15px;
+    line-height: 1.85;
+    color: #3a3a3a;
+    margin-bottom: 4px;
+  }}
+  /* 鍔犵矖銆佹枩浣?*/
+  .article strong {{
+    color: #1a1a1a;
+    font-weight: 600;
+  }}
+  /* 椤佃剼 */
+  .footer {{
+    background: #fafafa;
+    border-top: 1px solid #eee;
+    padding: 20px 40px;
+    text-align: center;
+  }}
+  .footer p {{
+    font-size: 11px;
+    color: #bbb;
+    line-height: 1.8;
+  }}
+  .footer a {{
+    color: #c41230;
+    text-decoration: none;
+  }}
+  @media (max-width: 480px) {{
+    body {{ padding: 10px 0; }}
+    .header {{ padding: 24px 20px; }}
+    .articles {{ padding: 24px 20px 32px; }}
+    .meta-bar {{ padding: 10px 20px; }}
+    .footer {{ padding: 16px 20px; }}
+  }}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <h1>DIAMOND 璐㈢粡鏃ユ姤</h1>
+        <div class="subtitle">鏃ユ湰璐㈢粡绮鹃€?路 AI 鎽樿缈昏瘧</div>
+      </div>
+      <div class="date-badge">
+        <span>鏃ユ湡</span>
+        {date_fmt}
+      </div>
+    </div>
+  </div>
+  <div class="meta-bar">浠婃棩鍏辨敹褰?{len(sections)} 绡囩簿閫夋枃绔?/div>
+  <div class="articles">{articles_html}</div>
+  <div class="footer">
+    <p>鐢?OpenClaw Agent 鑷姩鐢熸垚 路 姣忔棩瀹氭椂鎺ㄩ€?/p>
+    <p>鍘熸枃鏉ユ簮锛欴iamond Online (Yahoo News Japan)</p>
+  </div>
+</div>
+</body>
+</html>"""
     return html
 
 
-def send_daily_email(date_str=None):
-    if not date_str:
-        date_str = datetime.now().strftime("%Y%m%d")
-    filepath = os.path.join(TRANSLATE_DIR, date_str + ".md")
-    if not os.path.exists(filepath):
-        print("File not found: " + filepath)
-        return False
+def send_email(filepath):
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
+
     if not content.strip():
         print("File is empty: " + filepath)
         return False
-    print("Content length: " + str(len(content)) + " chars")
-    html = format_html(content, date_str)
+
+    date_str = extract_date(filepath)
+    date_fmt = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
+
+    html = make_html(content, date_str)
+
     msg = MIMEMultipart()
     msg["From"] = EMAIL_FROM
     msg["To"] = EMAIL_TO
-    msg["Subject"] = "DIAMOND Finance Daily - " + datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
+    msg["Subject"] = f"DIAMOND 璐㈢粡鏃ユ姤 路 {date_fmt}"
     msg.attach(MIMEText(html, "html", "utf-8"))
-    print("SMTP: " + SMTP_HOST + ":" + str(SMTP_PORT) + " -> " + EMAIL_TO)
+
+    print(f"SMTP: {SMTP_HOST}:{SMTP_PORT} -> {EMAIL_TO}")
     try:
         ctx = ssl.create_default_context()
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as server:
@@ -81,14 +282,10 @@ def send_daily_email(date_str=None):
 def main(filepath=None):
     if filepath is None and len(sys.argv) > 1:
         filepath = sys.argv[1]
-    if filepath:
-        m = re.search(r"(\d{8})", filepath)
-        if m:
-            send_daily_email(m.group(1))
-        else:
-            send_daily_email()
-    else:
-        send_daily_email()
+    if not filepath:
+        print("No filepath provided")
+        return
+    send_email(filepath)
 
 
 if __name__ == "__main__":
