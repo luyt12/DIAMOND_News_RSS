@@ -34,14 +34,14 @@ def extract_date(filepath):
 
 def make_html(combined_content, date_str):
     """
-    传入的是多篇文章摘要合并的 Markdown 内容。
-    解析每篇（以 ## 标题 分割），渲染为精美的 HTML。
+     Markdown 
+     ##   HTML
     """
     import markdown
 
-    date_fmt = datetime.strptime(date_str, "%Y%m%d").strftime("%Y年%m月%d日")
+    date_fmt = datetime.strptime(date_str, "%Y%m%d").strftime("%Y%m%d")
 
-    # 分割每篇文章（以 ## 开头即为新文章）
+    #  ## 
     sections = re.split(r"\n(?=## )", combined_content.strip())
 
     articles_html = ""
@@ -50,7 +50,7 @@ def make_html(combined_content, date_str):
         if not section:
             continue
 
-        # 将 Markdown 转为 HTML（只处理标题和段落）
+        #  Markdown  HTML
         article_html = markdown.markdown(
             section,
             extensions=['fenced_code', 'tables'],
@@ -67,7 +67,7 @@ def make_html(combined_content, date_str):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DIAMOND 财经日报 - {date_fmt}</title>
+<title>DIAMOND  - {date_fmt}</title>
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{
@@ -84,7 +84,7 @@ def make_html(combined_content, date_str):
     overflow: hidden;
     box-shadow: 0 4px 24px rgba(0,0,0,0.08);
   }}
-  /* 报头 */
+  /* header */
   .header {{
     background: linear-gradient(135deg, #c41230 0%, #8b0000 100%);
     color: #fff;
@@ -128,7 +128,7 @@ def make_html(combined_content, date_str):
     opacity: 0.7;
     margin-bottom: 2px;
   }}
-  /* 文章计数 */
+  /* article count */
   .meta-bar {{
     background: #fafafa;
     border-bottom: 1px solid #eee;
@@ -136,7 +136,7 @@ def make_html(combined_content, date_str):
     font-size: 13px;
     color: #888;
   }}
-  /* 文章列表 */
+  /* article list */
   .articles {{
     padding: 32px 40px 40px;
   }}
@@ -150,7 +150,7 @@ def make_html(combined_content, date_str):
     margin-bottom: 0;
     padding-bottom: 0;
   }}
-  /* 文章标题 */
+  /* article title */
   .article h2 {{
     font-size: 17px;
     font-weight: 600;
@@ -160,14 +160,14 @@ def make_html(combined_content, date_str):
     padding-left: 14px;
     border-left: 4px solid #c41230;
   }}
-  /* 文章正文 */
+  /* article body */
   .article p {{
     font-size: 15px;
     line-height: 1.85;
     color: #3a3a3a;
     margin-bottom: 10px;
   }}
-  /* 链接 */
+  /* links */
   .article a {{
     color: #c41230;
     text-decoration: none;
@@ -176,7 +176,7 @@ def make_html(combined_content, date_str):
   .article a:hover {{
     text-decoration: underline;
   }}
-  /* 原文链接区块 */
+  /* source link */
   .article em:has(a) {{
     display: block;
     margin-top: 12px;
@@ -184,7 +184,7 @@ def make_html(combined_content, date_str):
     color: #aaa;
     font-style: normal;
   }}
-  /* 列表 */
+  /* lists */
   .article ul, .article ol {{
     padding-left: 24px;
     margin: 8px 0;
@@ -195,12 +195,12 @@ def make_html(combined_content, date_str):
     color: #3a3a3a;
     margin-bottom: 4px;
   }}
-  /* 加粗、斜体 */
+  /* bold italic */
   .article strong {{
     color: #1a1a1a;
     font-weight: 600;
   }}
-  /* 页脚 */
+  /* footer */
   .footer {{
     background: #fafafa;
     border-top: 1px solid #eee;
@@ -230,20 +230,20 @@ def make_html(combined_content, date_str):
   <div class="header">
     <div class="header-inner">
       <div>
-        <h1>DIAMOND 财经日报</h1>
-        <div class="subtitle">日本财经精选 · AI 摘要翻译</div>
+        <h1>DIAMOND </h1>
+        <div class="subtitle"> · AI </div>
       </div>
       <div class="date-badge">
-        <span>日期</span>
+        <span></span>
         {date_fmt}
       </div>
     </div>
   </div>
-  <div class="meta-bar">今日共收录 {len(sections)} 篇精选文章</div>
+  <div class="meta-bar"> {len(sections)} </div>
   <div class="articles">{articles_html}</div>
   <div class="footer">
-    <p>由 OpenClaw Agent 自动生成 · 每日定时推送</p>
-    <p>原文来源：Diamond Online (Yahoo News Japan)</p>
+    <p> OpenClaw Agent  · </p>
+    <p>Diamond Online (Yahoo News Japan)</p>
   </div>
 </div>
 </body>
@@ -267,7 +267,7 @@ def send_email(filepath):
     msg = MIMEMultipart()
     msg["From"] = EMAIL_FROM
     msg["To"] = EMAIL_TO
-    msg["Subject"] = f"DIAMOND 财经日报 · {date_fmt}"
+    msg["Subject"] = f"DIAMOND  · {date_fmt}"
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     print(f"SMTP: {SMTP_HOST}:{SMTP_PORT} -> {EMAIL_TO}")
