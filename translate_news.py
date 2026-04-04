@@ -1,10 +1,11 @@
+"""
+DIAMOND 鏂囩珷缈昏瘧鍣?鍏堟彁鐐艰鐐癸紝鍐嶇炕璇戜负绠€浣撲腑鏂?姣忕瘒鏂囩珷杈撳嚭 300-500 瀛楃殑涓枃鎽樿
+"""
 import os
 import sys
-import glob
 import logging
 import requests
 import time
-from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -15,129 +16,111 @@ KIMI_API_URL = os.getenv("KIMI_API_URL", "https://integrate.api.nvidia.com/v1/ch
 INPUT_DIR = "dailynews"
 OUTPUT_DIR = "translate"
 
-TRANSLATION_PROMPT = """你是一位专业的翻译者，擅长将日语新闻，翻译为简体中文，请对我给出的内容进行翻译。请遵循以下要求：
+# 鍏堟彁鐐艰鐐癸紝鍐嶇炕璇戜负涓枃
+PROMPT = """浣犳槸涓€浣嶄笓涓氱殑璐㈢粡鏂伴椈缂栬緫銆傝瀵逛互涓嬫棩鏈储缁忔枃绔犲畬鎴愪袱姝ヤ换鍔★細
 
-# 翻译格式
-1. 使用Markdown格式输出
-2. 将所有英文/日文内容进行翻译，包括：标题、正文等
-3. 输出时，完整保留原始内容中，所有无需翻译的内容，不要遗漏
-4. 每篇翻译报道的标题，使用Markdown二级标题(##)
-5. 在每篇翻译报道下，注明原文的链接网址，不要改动
+## 绗竴姝ワ細鎻愮偧瑕佺偣
+浠旂粏闃呰鍘熸枃锛屾彁鍙栨渶鏍稿績鐨勪俊鎭偣锛?- 鏂囩珷璁ㄨ鐨勬牳蹇冭棰樻槸浠€涔堬紵
+- 鏈夊摢浜涘叧閿暟鎹€佹暟瀛椼€佹帓鍚嶏紵
+- 涓昏瑙傜偣鎴栫粨璁烘槸浠€涔堬紵
+- 瀵硅鑰呮渶閲嶈鐨勫惎绀烘槸浠€涔堬紵
 
-# 翻译风格与要求
-1. 准确性：忠实于原文意义，不歪曲、不遗漏关键信息
-2. 流畅性：译文清晰易懂，逻辑连贯，符合现代简体中文的表达习惯
-3. 简洁与优雅：主动拆分长句、优化语序、精炼用词、避免"翻译腔"
+## 绗簩姝ワ細缈昏瘧骞剁患杩?灏嗘彁鐐肩殑瑕佺偣缈昏瘧涓虹畝浣撲腑鏂囷紝鍐欎綔瑕佹眰锛?1. 杈撳嚭 300-500 瀛楃殑涓枃鎽樿
+2. 浣跨敤 Markdown 鏍煎紡锛屼簩绾ф爣棰樹负鏂囩珷鏍囬
+3. 鍦ㄦ爣棰樹笅鏂规敞鏄庡師鏂囬摼鎺?4. 鍑嗙‘鎬э細蹇犲疄鍘熸枃锛屼笉閬楁紡鍏抽敭鏁板瓧鍜岀粨璁?5. 娴佺晠鎬э細绗﹀悎鐜颁唬绠€浣撲腑鏂囪〃杈撅紝閬垮厤缈昏瘧鑵?6. 绠€娲佹€э細涓诲姩鎷嗗垎闀垮彞锛岀簿鐐肩敤璇?
+## 杈撳嚭鏍煎紡
+鐩存帴杈撳嚭涓枃鎽樿锛屼笉瑕佸姞鍏ヤ换浣曟棤鍏冲唴瀹癸紝涓嶈鍐?浠ヤ笅鏄憳瑕?涔嬬被鐨勫墠瑷€"""
 
-# 注意事项
-1. 直接输出，不要加入任何与原始内容无关的回应性语句"""
 
-def translate_with_kimi(content):
+def summarize_and_translate(content):
+    """璋冪敤 Kimi API 鎻愮偧瑕佺偣骞剁炕璇?""
     if not KIMI_API_KEY:
-        logging.error("未设置 kimi_API_KEY 环境变量")
+        logging.error("kimi_API_KEY 鏈缃?)
         sys.exit(1)
 
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {KIMI_API_KEY}"
     }
-
     data = {
         "model": KIMI_MODEL,
         "messages": [
-            {"role": "system", "content": TRANSLATION_PROMPT},
+            {"role": "system", "content": PROMPT},
             {"role": "user", "content": content}
         ],
         "temperature": 0.7,
-        "max_tokens": 16000
+        "max_tokens": 2000
     }
 
     for attempt in range(5):
         try:
-            logging.info(f"发送翻译请求 (尝试 {attempt + 1}/5)...")
-            response = requests.post(
+            logging.info(f"鎻愪氦鎽樿缈昏瘧璇锋眰 (灏濊瘯 {attempt + 1}/5)...")
+            resp = requests.post(
                 KIMI_API_URL,
                 headers=headers,
                 json=data,
                 timeout=300
             )
-            response.raise_for_status()
-            result = response.json()
-            if "choices" in result and len(result["choices"]) > 0:
+            resp.raise_for_status()
+            result = resp.json()
+            if result.get("choices") and result["choices"][0]:
                 return result["choices"][0]["message"]["content"]
             else:
-                logging.error(f"API 响应异常: {result}")
+                logging.error(f"API 鍝嶅簲寮傚父: {result}")
                 if attempt < 4:
-                    wait = 30 * (2 ** attempt)
-                    logging.info(f"等待 {wait} 秒后重试...")
-                    time.sleep(wait)
+                    time.sleep(30 * (2 ** attempt))
         except requests.exceptions.Timeout:
-            logging.error(f"API 请求超时 (尝试 {attempt + 1}/5)")
+            logging.error(f"API 瓒呮椂 (灏濊瘯 {attempt + 1}/5)")
             if attempt < 4:
-                wait = 30 * (2 ** attempt)
-                logging.info(f"等待 {wait} 秒后重试...")
-                time.sleep(wait)
-        except requests.exceptions.RequestException as e:
-            logging.error(f"API 请求失败: {e}")
-            if attempt < 4:
-                wait = 30 * (2 ** attempt)
-                logging.info(f"等待 {wait} 秒后重试...")
-                time.sleep(wait)
+                time.sleep(30 * (2 ** attempt))
         except Exception as e:
-            logging.error(f"未知错误: {e}")
+            logging.error(f"璇锋眰澶辫触: {e}")
             if attempt < 4:
-                time.sleep(30)
+                time.sleep(30 * (2 ** attempt))
     return None
 
-def translate_file(input_file_path):
-    if not os.path.exists(input_file_path):
-        logging.error(f"文件不存在: {input_file_path}")
-        return False
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    filename = os.path.basename(input_file_path)
-    output_file_path = os.path.join(OUTPUT_DIR, filename)
-    logging.info(f"开始翻译文件: {input_file_path}")
-    try:
-        with open(input_file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        logging.info(f"内容长度: {len(content)} 字符")
-        translated_content = translate_with_kimi(content)
-        if translated_content:
-            with open(output_file_path, 'w', encoding='utf-8') as f:
-                f.write(translated_content)
-            logging.info(f"翻译完成，已保存到: {output_file_path}")
-            return True
-        else:
-            logging.error(f"翻译失败: {input_file_path}")
-            return False
-    except Exception as e:
-        logging.error(f"处理文件时发生错误: {e}")
+
+def translate_file(filepath):
+    """缈昏瘧鍗曚釜鏂囦欢"""
+    if not os.path.exists(filepath):
+        logging.error(f"鏂囦欢涓嶅瓨鍦? {filepath}")
         return False
 
-def main():
-    if len(sys.argv) > 1:
-        input_file = sys.argv[1]
-        if not input_file.endswith('.md'):
-            input_file += '.md'
-        if os.path.sep in input_file or '/' in input_file:
-            input_file_path = input_file
-        else:
-            input_file_path = os.path.join(INPUT_DIR, input_file)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    outpath = os.path.join(OUTPUT_DIR, os.path.basename(filepath))
+
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    logging.info(f"寮€濮嬫彁鐐?缈昏瘧: {filepath} ({len(content)} 瀛楃)")
+
+    result = summarize_and_translate(content)
+
+    if result:
+        with open(outpath, 'w', encoding='utf-8') as f:
+            f.write(result)
+        logging.info(f"瀹屾垚: {outpath} ({len(result)} 瀛楃)")
+        return True
     else:
-        md_files = glob.glob(os.path.join(INPUT_DIR, "*.md"))
-        if not md_files:
-            logging.error("找不到任何 .md 文件")
-            sys.exit(1)
-        input_file_path = max(md_files, key=os.path.getmtime)
-    if not os.path.exists(input_file_path):
-        logging.error(f"找不到要翻译的文件: {input_file_path}")
-        sys.exit(1)
-    success = translate_file(input_file_path)
-    if success:
-        logging.info("翻译任务完成")
-    else:
-        logging.error("翻译任务失败")
-        sys.exit(1)
+        logging.error("缈昏瘧澶辫触")
+        return False
+
 
 if __name__ == "__main__":
-    main()
+    import glob
+    if len(sys.argv) > 1:
+        if os.path.isfile(sys.argv[1]):
+            translate_file(sys.argv[1])
+        else:
+            # 鎸夋枃浠跺悕妯″紡缈昏瘧
+            pattern = os.path.join(INPUT_DIR, sys.argv[1])
+            files = sorted(glob.glob(pattern))
+            for f in files:
+                translate_file(f)
+    else:
+        files = sorted(glob.glob(os.path.join(INPUT_DIR, "*.md")))
+        if files:
+            for f in files:
+                translate_file(f)
+        else:
+            logging.error("娌℃湁鎵惧埌鏂囩珷鏂囦欢")
