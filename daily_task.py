@@ -83,11 +83,12 @@ print("Combined " + str(len(translated_contents)) + " articles, " + str(len(comb
 
 print("Sending email...")
 import send_email
-try:
-    send_email.main(combined_file)
+ok = send_email.main(combined_file)
+
+if ok:
     print("Email sent successfully!")
-except Exception as e:
-    print("Email failed: " + str(e))
+else:
+    print("Email FAILED - check error above")
 
 try:
     os.remove(combined_file)
@@ -95,4 +96,4 @@ except Exception:
     pass
 
 save_sent(sent_urls)
-print("Done: " + str(len(translated_contents)) + " articles sent")
+print("Done: " + str(len(translated_contents)) + " articles processed")
