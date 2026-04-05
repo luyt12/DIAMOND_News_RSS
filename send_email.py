@@ -82,12 +82,19 @@ def make_html(content, date_str):
     return HTML_TPL.replace("{{DATE}}", df).replace("{{COUNT}}", str(len(secs))).replace("{{ARTICLES}}", arts_html)
 
 
-def send_email(path):
+def main(path=None):
+    if path is None and len(sys.argv) > 1:
+        path = sys.argv[1]
+    if not path:
+        print("No filepath")
+        return False
+
     with open(path, "r", encoding="utf-8") as f:
         c = f.read()
     if not c.strip():
         print("Empty file:", path)
         return False
+
     ds = extract_date(path)
     df = datetime.strptime(ds, "%Y%m%d").strftime("%Y-%m-%d")
     html = make_html(c, ds)
@@ -96,27 +103,20 @@ def send_email(path):
     msg["To"] = EMAIL_TO
     msg["Subject"] = "DIAMOND 日报 · " + df
     msg.attach(MIMEText(html, "html", "utf-8"))
+
     print("SMTP: %s:%s -> %s" % (SMTP_HOST, SMTP_PORT, EMAIL_TO))
-    try:
-        ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as s:
-            s.login(SMTP_USER, SMTP_PASS)
-            s.sendmail(EMAIL_FROM, [EMAIL_TO], msg.as_string())
-        print("Email sent:", EMAIL_TO)
-        return True
-    except Exception as e:
-        print("Error:", e)
-        return False
-
-
-def main(path=None):
-    if path is None and len(sys.argv) > 1:
-        path = sys.argv[1]
-    if not path:
-        print("No filepath")
-        return
-    send_email(path)
+    ctx = ssl.create_default_context()
+    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as s:
+        s.login(SMTP_USER, SMTP_PASS)
+        s.sendmail(EMAIL_FROM, [EMAIL_TO], msg.as_string())
+    print("Email sent:", EMAIL_TO)
+    return True
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        ok = main()
+        sys.exit(0 if ok else 1)
+    except Exception as e:
+        print("Error:", e)
+        sys.exit(1)
