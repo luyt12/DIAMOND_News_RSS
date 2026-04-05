@@ -70,7 +70,7 @@ def extract_date(path):
 
 
 def make_html(content, date_str):
-    df = datetime.strptime(date_str, "%Y%m%d").strftime("%Y年%m月%d日")
+    df = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
     secs = re.split(r"\n(?=## )", content.strip())
     arts_html = ""
     for i, s in enumerate(secs):
