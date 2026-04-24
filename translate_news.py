@@ -1,7 +1,3 @@
-"""
-DIAMOND article translator
-Summarize and translate Japanese articles to Chinese
-"""
 import os
 import sys
 import logging
@@ -10,7 +6,7 @@ import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-KIMI_API_KEY = os.getenv("kimi_API_KEY")
+KIMI_API_KEY = os.getenv("KIMI_API_KEY")
 KIMI_MODEL = os.getenv("KIMI_MODEL", "moonshotai/kimi-k2.5")
 KIMI_API_URL = os.getenv("KIMI_API_URL", "https://integrate.api.nvidia.com/v1/chat/completions")
 
@@ -34,7 +30,7 @@ Output the Chinese summary directly, no introductions or meta-comments."""
 
 def summarize_and_translate(content):
     if not KIMI_API_KEY:
-        logging.error("kimi_API_KEY not set")
+        logging.error("KIMI_API_KEY not set")
         sys.exit(1)
 
     headers = {
