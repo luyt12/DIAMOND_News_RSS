@@ -25,5 +25,17 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
+      - name: Restore processed_urls cache
+        uses: actions/cache@v4
+        with:
+          path: processed_urls.json
+          key: diamond-processed-${{ github.run_id }}
+          restore-keys: |
+            diamond-processed-
       - name: Run daily task
         run: python daily_task.py
+      - name: Save processed_urls cache
+        uses: actions/cache/save@v4
+        with:
+          path: processed_urls.json
+          key: diamond-processed-${{ github.run_id }}
