@@ -1,6 +1,7 @@
 """
 DIAMOND RSS Parser
-Fetch today articles, dedup, save each separately
+Fetch today articles, dedup, save each separately.
+新特性：当日无文章时，自动回退到历史未处理文章。
 """
 import feedparser, requests, pytz, json, time, logging, os
 from bs4 import BeautifulSoup
@@ -108,12 +109,10 @@ def main():
 
     logging.info("RSS total: %s entries", len(feed_data.entries))
 
-    candidates = []
+    # 解析所有文章
+    all_articles = []
     for entry in feed_data.entries:
         link = entry.link.strip()
-        if link in sent_urls:
-            logging.info("Already sent, skip: %s", entry.title)
-            continue
         ps = entry.get("published_parsed")
         if not ps:
             continue
@@ -121,12 +120,31 @@ def main():
         if not dt_gmt:
             continue
         dt_tokyo = dt_gmt.astimezone(TZ_TOKYO)
-        if not is_today(dt_tokyo):
-            continue
-        candidates.append({"title": entry.title, "link": link, "pub_str": dt_tokyo.strftime("%Y-%m-%d %H:%M:%S"), "pub_dt": dt_tokyo})
+        all_articles.append({
+            "title": entry.title,
+            "link": link,
+            "pub_str": dt_tokyo.strftime("%Y-%m-%d %H:%M:%S"),
+            "pub_dt": dt_tokyo,
+            "is_today": is_today(dt_tokyo)
+        })
+
+    logging.info("RSS 共 %s 篇文章", len(all_articles))
+
+    # 优先今日文章，无则回退到历史未处理
+    today_articles = [a for a in all_articles if a["is_today"] and a["link"] not in sent_urls]
+    logging.info("今日新文章: %s 篇", len(today_articles))
+
+    if today_articles:
+        candidates = today_articles
+        logging.info("→ 使用今日文章: %s 篇", len(candidates))
+    else:
+        # 回退到历史未处理文章
+        historical = [a for a in all_articles if a["link"] not in sent_urls]
+        logging.info("→ 今日无文章，回退到历史未处理: %s 篇", len(historical))
+        candidates = historical
 
     if not candidates:
-        logging.info("No new articles today")
+        logging.info("无新文章")
         return None
 
     candidates.sort(key=lambda x: x["pub_dt"], reverse=True)
