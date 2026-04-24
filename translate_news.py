@@ -17,23 +17,16 @@ KIMI_API_URL = os.getenv("KIMI_API_URL", "https://integrate.api.nvidia.com/v1/ch
 INPUT_DIR = "dailynews"
 OUTPUT_DIR = "translate"
 
-PROMPT = """You are a professional financial news editor. Please complete two tasks on the Japanese article below:
+PROMPT = """You are a professional financial news editor. Please complete the following task on the Japanese article below:
 
-## Task 1: Extract Key Points
-Read the original text carefully and extract the most important information:
-- What is the core topic or argument?
-- What key data, numbers, or rankings are mentioned?
-- What are the main conclusions?
-- What is the most important takeaway for readers?
-
-## Task 2: Translate and Summarize
-Translate the extracted key points into Simplified Chinese with these requirements:
-1. Output 300-500 characters in Chinese summary
-2. Use Markdown format, second-level heading for article title
-3. Include original article link below the title
-4. Accuracy: faithful to original, preserve key data and conclusions
-5. Fluency: natural modern Chinese, avoid translationese
-6. Conciseness: break long sentences, use precise language
+## Task: Extract and Summarize
+Extract key points from the article and write a Chinese summary with these requirements:
+1. No need to translate the full text - extract key points directly from the Japanese
+2. High information density - cover main points, background, and significance
+3. Keep key details (names, institutions, data)
+4. Word count: if original > 2000 English words, Chinese summary ~1000 characters (~50% of original); if < 2000 words, can translate fully
+5. Concise style, avoid "This article discusses..." filler
+6. Stay neutral on controversial topics
 
 ## Output Format
 Output the Chinese summary directly, no introductions or meta-comments."""
