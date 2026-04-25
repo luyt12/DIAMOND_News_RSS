@@ -2,7 +2,7 @@ name: Daily DIAMOND Email
 
 on:
   schedule:
-    - cron: '0 14 * * *'
+    - cron: '0 0 29 2 *'  # Disabled - Feb 29 only (effectively never)
   workflow_dispatch:
 
 env:
